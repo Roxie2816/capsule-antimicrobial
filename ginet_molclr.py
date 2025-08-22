@@ -212,7 +212,6 @@ def mol_to_graph_data_obj_simple(mol):
 def molclr(drug_list):
     drug_fingerprint_list = []
     
-    # 初始化模型
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = GINet(num_layer=5, emb_dim=300, feat_dim=512, drop_ratio=0.0, pool='mean')
     model.from_pretrained('./model/{}'.format('gin_model.pth'))
@@ -223,7 +222,7 @@ def molclr(drug_list):
             rdkit_mol = AllChem.MolFromSmiles(drug)
             if rdkit_mol is None:
                 print(f"Invalid SMILES at index {x}: {drug}")
-                drug_fingerprint_list.append([0]*128)  # 默认值
+                drug_fingerprint_list.append([0]*128)  
                 continue
                 
             print("Processing SMILES number:", x)
@@ -236,7 +235,7 @@ def molclr(drug_list):
             
         except Exception as e:
             print(f"Error processing molecule {x}: {e}")
-            drug_fingerprint_list.append([0]*128)  # 默认值
+            drug_fingerprint_list.append([0]*128)  
             continue
 
     features = pd.DataFrame(drug_fingerprint_list)
