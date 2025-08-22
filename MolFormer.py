@@ -687,13 +687,10 @@ import yaml
 from typing import List, Optional
 import numpy as np
 import pandas as pd
-# def molformer(smiles_list: List[str]) -> np.ndarray:
 def molformer(smiles_list: List[str]) -> pd.DataFrame:
 
-
-    # 1. 加载配置和模型
     def _load_model():
-        """加载预训练模型和tokenizer"""
+        """load pretrained model and tokenizer"""
         try:
             with open('./model/hparams.yaml', 'r') as f:
                 config = Namespace(**yaml.safe_load(f))
@@ -711,26 +708,23 @@ def molformer(smiles_list: List[str]) -> pd.DataFrame:
             model.eval()
             return model, tokenizer
         except Exception as e:
-            raise RuntimeError(f"模型加载失败: {str(e)}")
+            raise RuntimeError(f"Fail to load model: {str(e)}")
 
-    # 2. 批处理生成器
     def _batch_split(data: List[str], batch_size: int = 64):
-        """将数据分割成批次"""
+        """split data into batches"""
         for i in range(0, len(data), batch_size):
             yield data[i:i + batch_size]
 
-    # 3. 规范化SMILES
     def _canonicalize(smiles: str) -> Optional[str]:
-        """规范化SMILES字符串"""
+        """canonical SMILES str"""
         try:
             mol = Chem.MolFromSmiles(smiles)
             return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=False) if mol else None
         except:
             return None
 
-    # 4. 嵌入生成函数
     def _embed(model, tokenizer, smiles_batch: List[str]) -> torch.Tensor:
-        """生成单个批次的嵌入"""
+        """generate embedding for one batch"""
         batch_enc = tokenizer.batch_encode_plus(
             smiles_batch, 
             padding=True, 
@@ -744,15 +738,12 @@ def molformer(smiles_list: List[str]) -> pd.DataFrame:
                 length_mask=LM(batch_enc['attention_mask'].sum(-1))
             )
         
-        # 平均池化
         mask = batch_enc['attention_mask'].unsqueeze(-1).float()
         sum_embeddings = torch.sum(token_embeddings * mask, 1)
         sum_mask = torch.clamp(mask.sum(1), min=1e-9)
         return (sum_embeddings / sum_mask).cpu()
 
-    # 主处理流程
     try:
-        # 规范化SMILES并过滤无效项
         valid_smiles = []
         for s in smiles_list:
             canon = _canonicalize(s)
@@ -760,26 +751,23 @@ def molformer(smiles_list: List[str]) -> pd.DataFrame:
                 valid_smiles.append(canon)
         
         if not valid_smiles:
-            raise ValueError("没有有效的SMILES输入")
+            raise ValueError("No valid SMILES input detected.")
         
-        # 加载模型
         model, tokenizer = _load_model()
         
-        # 分批处理生成嵌入
+        # generate embeddings
         embeddings = []
         for batch in _batch_split(valid_smiles):
             embeddings.append(_embed(model, tokenizer, batch))
         embeddings_array = torch.cat(embeddings).numpy()
         
-        # 创建DataFrame并添加列名
         columns = [f"molformer_{i}" for i in range(embeddings_array.shape[1])]
         df = pd.DataFrame(embeddings_array, columns=columns)
-        # 合并结果并转换为numpy
         # return torch.cat(embeddings).numpy()
         return df
     
     except Exception as e:
-        raise RuntimeError(f"嵌入生成失败: {str(e)}")
+        raise RuntimeError(f"Failed to generate embeddings: {str(e)}")
     
 if __name__ == '__main__':
     # Example SMILES strings
@@ -794,4 +782,5 @@ if __name__ == '__main__':
         print(f"Text version saved to molformer_embeddings.csv")
         
     except Exception as e:
+
         print(f"Error: {str(e)}")
