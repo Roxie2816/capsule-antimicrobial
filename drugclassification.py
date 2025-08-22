@@ -82,67 +82,37 @@ def step_decay(epoch):
 
 # def evaluate(model_parh, test_d, test_y, model_name):
 def evaluate(model_path_prefix, test_d, test_y, model_name):
-    ###
-    # model_files = [f for f in os.listdir(model_path_prefix) if f.endswith('.h5')]
-    # model_files.sort()
-    # if model_files:
-    #     last_model_file = os.path.join(model_path_prefix, model_files[-1])
-    # else:
-    #     print("未找到 .h5 模型文件。")
-    #     return
-    
-    # print(f"尝试加载的模型路径: {last_model_file}", flush=True)
-    ###
-    # print(f"尝试加载的模型路径: {model_parh}", flush=True)
     print("=============Start Evaluate! ===========", flush=True)
     # model = load_model(last_model_file, compile=False, ###
     model = load_model(model_path_prefix, compile=False,
                            custom_objects={'Capsule': Capsule, 'Length': Length,'TransformerEncoderReadout': TransformerEncoderReadout, 'squash': squash}) ###新增了一个squash
-    pred0 = model.predict([np.array(test_d)]) 
+    proba = model.predict([np.array(test_d)]) 
     # loss, _, accuracy, auc, precision, recall, tp, tn, fp, fn = model.evaluate(np.array(test_d), np.array(test_y), verbose=0)
-    pred = np.argmax(pred0, -1)
-    confusion = metrics.confusion_matrix(np.array(test_y)[:, 1], pred)
-    TP = confusion[1, 1]
-    TN = confusion[0, 0]
-    FP = confusion[0, 1]
-    FN = confusion[1, 0]
+    pred  = np.argmax(proba, axis=1)
 
-    sensitivity = recall_score(np.array(test_y)[:, 1], pred)
-    specificity = TN / float(TN + FP)
-    precision = precision_score(np.array(test_y)[:, 1], pred)
-    accuracy = accuracy_score(np.array(test_y)[:, 1], pred)
-    f1 = f1_score(np.array(test_y)[:, 1], pred)
-    aucroc = roc_auc_score(np.array(test_y)[:, 1], pred0[:, 1])
-    # aupr=average_precision_score(np.array(test_y)[:,1],pred0[:,1])
-    fpr0, tpr0, thresholds0 = metrics.roc_curve(np.array(test_y)[:, 1], pred0[:, 1])
-    auc_v = metrics.auc(fpr0, tpr0)
-    precision0, recall, thresholds = metrics.precision_recall_curve(np.array(test_y)[:, 1], pred0[:, 1])
-    area = metrics.auc(recall, precision0)
-    print("sensitivity", round(sensitivity, 3))
-    print("specificity", round(specificity, 3))
-    print("precision", round(precision, 3))
-    print("accuracy", round(accuracy, 3))
-    print("f1", round(f1, 3))
-    print("TP:", TP)
-    print("TN:", TN)
-    print("FP:", FP)
-    print("FN:", FN)
-    print("aucroc:", round(auc_v, 3))
-    print("aupr:", round(area, 3))
-    # print("Loss:", loss)
+    sensitivity = metrics.recall_score(test_y, pred)
+    specificity = metrics.recall_score(test_y, pred, pos_label=0)
+    precision   = metrics.precision_score(test_y, pred)
+    accuracy    = metrics.accuracy_score(test_y, pred)
+    f1          = metrics.f1_score(test_y, pred)
+    aucroc      = metrics.roc_auc_score(test_y, proba[:, 1])
+
+    fpr, tpr, _ = metrics.roc_curve(test_y, proba[:, 1])
+    # aupr        = metrics.auc(*metrics.precision_recall_curve(predict_y, proba[:, 1])[::-1])
+    aupr = metrics.average_precision_score(test_y, proba[:, 1])
 
     with open(os.path.join(model_name, "performance.txt"), "w") as fw:
         fw.write(
             "Evaluation metrics" + "\t" + "sensitivity" + "\t" + "specificity" + "\t" + "precision" + "\t" + "accuracy" + "\t" + "f1" + "\t" + "aucroc" + "\t" + "aupr" + "\n")
         fw.write("Value" + "\t" + str(round(sensitivity, 3)) + "\t" + str(round(specificity, 3)) + "\t" + str(
             round(precision, 3)) + "\t" + str(round(accuracy, 3)) + "\t" + str(round(f1, 3)) + "\t" + str(
-            round(auc_v, 3)) + "\t" + str(round(area, 3)) + "\n")
+            round(aucroc, 3)) + "\t" + str(round(aupr, 3)) + "\n")
         # df_evaluate = pd.DataFrame({"dataset":[dti],"classifier": [model_name], "accuracy": [
-        df_evaluate = pd.DataFrame({"classifier": [model_name], "accuracy": [str(accuracy)], "specificity": [str(specificity)],"sensitivity": [str(sensitivity)], "aucroc": [str(auc_v)], "aupr": [str(area)],"f1": [str(f1)]})
+        df_evaluate = pd.DataFrame({"classifier": [model_name], "accuracy": [str(accuracy)], "specificity": [str(specificity)],"sensitivity": [str(sensitivity)],"precision": [str(precision)], "f1": [str(f1)], "aucroc": [str(aucroc)], "aupr": [str(aupr)]})
         df_evaluate.to_csv("./output/evaluate-performance.csv", mode="a", index=None)
         # df_evaluate.to_csv("./result/evaluate-performance_2.csv", mode="a", index=None)
     print("=============Evaluate Over! ===========", flush=True)
-    return sensitivity, specificity, precision, accuracy, f1, auc_v, area
+    return sensitivity, specificity, precision, accuracy, f1, aucroc, aupr
 
 
 def plot_training_history(history, name):
@@ -474,8 +444,6 @@ def main():
             plot_training_history(history1, args.model_name)
 
         elif args.predict:
-            # if not args.predict_csv:
-                # raise ValueError('--predict 时必须提供 --predict-csv')
 
             # 1. 拼模型路径
             train_path = os.path.join(args.model_name, args.model_name)
@@ -502,7 +470,22 @@ def main():
 
             # 4. 根据是否有 ground-truth 决定输出
             if predict_y is not None:
-                evaluate(best_model_path, predict_d, predict_y, args.model_name)
+                # predict_y_onehot = to_categorical(predict_y, num_classes=2)
+                # evaluate(best_model_path, predict_d, predict_y_onehot, args.model_name)
+                pred  = np.argmax(proba, axis=1)
+
+                sensitivity = metrics.recall_score(predict_y, pred)
+                specificity = metrics.recall_score(predict_y, pred, pos_label=0)
+                precision   = metrics.precision_score(predict_y, pred)
+                accuracy    = metrics.accuracy_score(predict_y, pred)
+                f1          = metrics.f1_score(predict_y, pred)
+                aucroc      = metrics.roc_auc_score(predict_y, proba[:, 1])
+
+                fpr, tpr, _ = metrics.roc_curve(predict_y, proba[:, 1])
+                # aupr        = metrics.auc(*metrics.precision_recall_curve(predict_y, proba[:, 1])[::-1])
+                aupr = metrics.average_precision_score(predict_y, proba[:, 1])
+                predict_results = pd.DataFrame({"classifier": [model_name], "accuracy": [str(accuracy)], "specificity": [str(specificity)],"sensitivity": [str(sensitivity)],"precision": [str(precision)], "f1": [str(f1)], "aucroc": [str(aucroc)], "aupr": [str(aupr)]})
+                predict_results.to_csv("./output/prediction-result.csv", mode="a", index=None)
             else:
                 predict_results = pd.DataFrame({
                     'predicted_label': pred_label,
@@ -516,7 +499,7 @@ def main():
             
     except Exception as e:
         print(f"处理失败: {str(e)}")
-        traceback.format_exc()
+        print(traceback.format_exc())
         exit(1)
         # 这里可以添加模型训练代码
         # train_model(feature_df, args)
