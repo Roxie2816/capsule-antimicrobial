@@ -3,7 +3,7 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
-import matplotlib as plt
+import matplotlib.pyplot as plt
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import LearningRateScheduler, EarlyStopping, ModelCheckpoint, CSVLogger
 from sklearn.model_selection import StratifiedKFold
@@ -70,16 +70,16 @@ def evaluate(model_path_prefix, test_d, test_y, model_name):
     # loss, _, accuracy, auc, precision, recall, tp, tn, fp, fn = model.evaluate(np.array(test_d), np.array(test_y), verbose=0)
     pred  = np.argmax(proba, axis=1)
 
-    sensitivity = metrics.recall_score(test_y, pred)
-    specificity = metrics.recall_score(test_y, pred, pos_label=0)
-    precision   = metrics.precision_score(test_y, pred)
-    accuracy    = metrics.accuracy_score(test_y, pred)
-    f1          = metrics.f1_score(test_y, pred)
-    aucroc      = metrics.roc_auc_score(test_y, proba[:, 1])
+    sensitivity = metrics.recall_score(test_y[:,1], pred)
+    specificity = metrics.recall_score(test_y[:,1], pred, pos_label=0)
+    precision   = metrics.precision_score(test_y[:,1], pred)
+    accuracy    = metrics.accuracy_score(test_y[:,1], pred)
+    f1          = metrics.f1_score(test_y[:,1], pred)
+    aucroc      = metrics.roc_auc_score(test_y[:,1], proba[:, 1])
 
-    fpr, tpr, _ = metrics.roc_curve(test_y, proba[:, 1])
+    fpr, tpr, _ = metrics.roc_curve(test_y[:,1], proba[:, 1])
     # aupr        = metrics.auc(*metrics.precision_recall_curve(predict_y, proba[:, 1])[::-1])
-    aupr = metrics.average_precision_score(test_y, proba[:, 1])
+    aupr = metrics.average_precision_score(test_y[:,1], proba[:, 1])
 
     with open(os.path.join(model_name, "performance.txt"), "w") as fw:
         fw.write(
@@ -98,7 +98,8 @@ def plot_training_history(history, name):
     plt.figure(dpi=300)
     plt.plot(epochs, history.history['accuracy'], '#228B8B', label='Training acc')
     plt.scatter(epochs, history.history['accuracy'], color='#228B8B', s=12)
-    plt.title('Training and Validation accuracy')
+    # plt.title('Training and Validation accuracy')
+    plt.title('Training accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.legend()
@@ -109,7 +110,8 @@ def plot_training_history(history, name):
     plt.scatter(epochs, history.history['loss'], color='#228B8B', s=12)
     # plt.plot(epochs,history.history['val_loss'],'#8B2222',label='Validation val_loss')
     # plt.scatter(epochs,history.history['val_loss'],color='#8B2222',s=12)
-    plt.title('Training and Validation loss')
+    # plt.title('Training and Validation loss')
+    plt.title('Training loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
@@ -160,6 +162,7 @@ def fitting(train_d, test_d, train_y, test_y, model_type, lr, ep, path, batchsiz
                                             all_aucroc = []
                                             all_aupr = []
                                             all_f1 = []
+                                            all_precision = []
                                             fw = open(os.path.join(train_path, "search_process.txt"), "a")
                                             fw.write(
                                                 "drug_dense,batch_size,message_units,message_steps,num_attention_heads,dense_units,num_capsule,routings,kernel_size, target_dense\n")
@@ -198,15 +201,15 @@ def fitting(train_d, test_d, train_y, test_y, model_type, lr, ep, path, batchsiz
                                                 proba = model_1.predict(train_d_val)
                                                 pred = np.argmax(proba, axis=1)
                                                 accuracy = metrics.accuracy_score(np.array(train_y_val)[:, 1], pred)
-                                                sensitivity = metrics.recall_score(train_y_val, pred)
-                                                specificity = metrics.recall_score(train_y_val, pred, pos_label=0)
-
+                                                sensitivity = metrics.recall_score(np.array(train_y_val)[:, 1], pred)
+                                                specificity = metrics.recall_score(np.array(train_y_val)[:, 1], pred, pos_label=0)
+                                                precision = metrics.precision_score(np.array(train_y_val)[:, 1], pred)
                                                 fpr0, tpr0, thresholds0 = metrics.roc_curve(np.array(train_y_val)[:, 1],
                                                                                             pred)
                                                 f1 = metrics.f1_score(np.array(train_y_val)[:, 1], pred)
                                                 # auc_v = metrics.auc(fpr0, tpr0)
-                                                aucroc      = metrics.roc_auc_score(train_y_val, proba[:, 1])
-                                                aupr = metrics.average_precision_score(predict_y, proba[:, 1])
+                                                aucroc      = metrics.roc_auc_score(np.array(train_y_val)[:, 1], proba[:, 1])
+                                                aupr = metrics.average_precision_score(np.array(train_y_val)[:, 1], proba[:, 1])
                                                 
                                                 fw = open(os.path.join(train_path, "search_process.txt"), "a")
                                                 # fw.write("#####Fold" + str(i) + "\n")
@@ -214,8 +217,8 @@ def fitting(train_d, test_d, train_y, test_y, model_type, lr, ep, path, batchsiz
                                                 fw.write("specificity:" + str(round(specificity, 4)) + "\t")
                                                 fw.write("sensitivity:" + str(round(sensitivity, 4)) + "\t")
                                                 fw.write("precision:" + str(round(precision, 4)) + "\t")
-                                                fw.write("aucroc:" + str(round(auc_v, 4)) + "\t")
-                                                fw.write("aupr:" + str(round(area, 4)) + "\t")
+                                                fw.write("aucroc:" + str(round(aucroc, 4)) + "\t")
+                                                fw.write("aupr:" + str(round(aupr, 4)) + "\t")
                                                 fw.write("f1:" + str(round(f1, 4)) + "\n")
                                                 all_acc_scores.append(accuracy)
                                                 all_f1.append(f1)
@@ -244,21 +247,25 @@ def fitting(train_d, test_d, train_y, test_y, model_type, lr, ep, path, batchsiz
             best_kernel_size) + "\n")
         fw.write(
             "accuracy,specificity,sensitivity,aucroc,aupr,f1\n")
-        fw.write(str(best_score) + "±" + str(np.std(all_acc_scores)) + "," + str(
-            np.mean(all_specificity)) + "±" + str(np.std(all_specificity)) + str(
-            np.mean(all_sensitivity)) + "±" + str(np.std(all_sensitivity)) + str(
-            np.mean(all_aucroc)) + "±" + str(np.std(all_aucroc)) + str(
-            np.mean(all_aupr)) + "±" + str(np.std(all_aupr)) + str(
-            np.mean(all_precision) + "±" + str(np.std(all_precision)) + str(
-            np.mean(all_f1)) + "±" + str(np.std(all_f1)) + "\n")
-        df = pd.DataFrame({"classifier": [model_type], "accuracy": [
-            str(best_score) + "±" + str(np.std(all_acc_scores))], "specificity": [
-            str(np.mean(all_specificity)) + "±" + str(np.std(all_specificity))],
-                           "sensitivity": [str(np.mean(all_sensitivity)) + "±" + str(
-                               np.std(all_sensitivity))], "aucroc": [
-                str(np.mean(all_aucroc)) + "±" + str(np.std(all_aucroc))], "aupr": [
-                str(np.mean(all_aupr)) + "±" + str(np.std(all_aupr))],
-                           "f1": [str(np.mean(all_f1)) + "±" + str(np.std(all_f1))]})
+        fw.write(
+            f"{best_score}±{np.std(all_acc_scores):.4f},"
+            f"{np.mean(all_specificity):.4f}±{np.std(all_specificity):.4f},"
+            f"{np.mean(all_sensitivity):.4f}±{np.std(all_sensitivity):.4f},"
+            f"{np.mean(all_aucroc):.4f}±{np.std(all_aucroc):.4f},"
+            f"{np.mean(all_aupr):.4f}±{np.std(all_aupr):.4f},"
+            f"{np.mean(all_precision):.4f}±{np.std(all_precision):.4f},"
+            f"{np.mean(all_f1):.4f}±{np.std(all_f1):.4f}\n"
+        )
+        val_metrics = {
+            'accuracy'   : f"{best_score:.4f}±{np.std(all_acc_scores):.4f}",
+            'specificity': f"{np.mean(all_specificity):.4f}±{np.std(all_specificity):.4f}",
+            'sensitivity': f"{np.mean(all_sensitivity):.4f}±{np.std(all_sensitivity):.4f}",
+            'aucroc'     : f"{np.mean(all_aucroc):.4f}±{np.std(all_aucroc):.4f}",
+            'aupr'       : f"{np.mean(all_aupr):.4f}±{np.std(all_aupr):.4f}",
+            'f1'         : f"{np.mean(all_f1):.4f}±{np.std(all_f1):.4f}",
+        }
+
+        df = pd.DataFrame({"classifier": [model_type], **val_metrics})
         df.to_csv("./output/5fold-performance.csv", mode="a", index=None) ###
         fw.close()
         adam = Adam(learning_rate=lr)
