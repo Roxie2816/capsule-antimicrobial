@@ -34,27 +34,26 @@ class MultiHeadAttention(layers.Layer):
         k_heads = self.transpose_for_scores(k_proj)  # [batch, heads, seq_len_k, head_dim]
         v_heads = self.transpose_for_scores(v_proj)  # [batch, heads, seq_len_v, head_dim]
         
-        # 计算注意力分数
+        # Calculate attention score
         attention_scores = tf.matmul(q_heads, k_heads, transpose_b=True)  # [batch, heads, seq_len_q, seq_len_k]
         attention_scores = attention_scores / tf.math.sqrt(float(self.head_dim))
         
-        # 应用掩码（如果提供）
+        # Apply mask (if have)
         if mask is not None:
-            # 掩码形状: [batch, 1, seq_len_q, seq_len_k]
+            # mask shape: [batch, 1, seq_len_q, seq_len_k]
             mask = tf.expand_dims(mask, axis=1)
             adder = (1.0 - tf.cast(mask, tf.float32)) * -10000.0
             attention_scores = attention_scores + adder
         
-        # 计算注意力权重
+        # Calculate attention weight
         attention_probs = tf.nn.softmax(attention_scores, axis=-1)  # [batch, heads, seq_len_q, seq_len_k]
         attention_probs = self.dropout(attention_probs, training=training)
         
-        # 应用注意力
+        # Apply attention
         context = tf.matmul(attention_probs, v_heads)  # [batch, heads, seq_len_q, head_dim]
         context = tf.transpose(context, [0, 2, 1, 3])  # [batch, seq_len_q, heads, head_dim]
         context = tf.reshape(context, [tf.shape(context)[0], tf.shape(context)[1], self.all_head_dim])
         
-        # 输出投影
         output = self.output_proj(context)  # [batch, seq_len_q, hidden_dim]
         
         return output, attention_probs
@@ -82,91 +81,78 @@ class CrossAttentionLayer(layers.Layer):
         self.dropout = layers.Dropout(dropout_rate)
         
     def call(self, q, k, v, mask=None, training=None):
-        # 自注意力
+        # self-attention
         attn_output, attention_probs = self.attention(q, k, v, mask, training=training)
         attn_output = self.dropout(attn_output, training=training)
-        attn_output = self.attention_norm(q + attn_output)  # 残差连接和层归一化
+        attn_output = self.attention_norm(q + attn_output) 
         
-        # 前馈网络
+        # forward
         ffn_output = self.ffn(attn_output, training=training)
-        ffn_output = self.ffn_norm(attn_output + ffn_output)  # 残差连接和层归一化
+        ffn_output = self.ffn_norm(attn_output + ffn_output)  
         
         return ffn_output, attention_probs
 
 class MolecularCrossAttention(keras.Model):
     """
-    处理五种分子嵌入的交叉注意力模型:
-    - 序列型嵌入: ChemBERT, SMoleBERT, Molformer
-    - 图型嵌入: MoleBERT, MolCLR
+    Five molecule embedding inputs:
+    - sequence-type: ChemBERT, SMoleBERT, Molformer
+    - graph-type: MoleBERT, MolCLR
     """
     def __init__(self, hidden_dim=768, num_heads=12, intermediate_dim=3072, num_layers=1, dropout_rate=0.1):
         super(MolecularCrossAttention, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
         
-        # 序列型嵌入处理层
         self.seq_layers = [
             CrossAttentionLayer(hidden_dim, num_heads, intermediate_dim, dropout_rate)
             for _ in range(num_layers)
         ]
         
-        # 图型嵌入处理层
         self.graph_layers = [
             CrossAttentionLayer(hidden_dim, num_heads, intermediate_dim, dropout_rate)
             for _ in range(num_layers)
         ]
         
-        # 序列-图交叉注意力层
         self.seq_to_graph_layers = [
             CrossAttentionLayer(hidden_dim, num_heads, intermediate_dim, dropout_rate)
             for _ in range(num_layers)
         ]
         
-        # 图-序列交叉注意力层
         self.graph_to_seq_layers = [
             CrossAttentionLayer(hidden_dim, num_heads, intermediate_dim, dropout_rate)
             for _ in range(num_layers)
         ]
         
-        # 输出投影层
         self.seq_output = layers.Dense(hidden_dim)
         self.graph_output = layers.Dense(hidden_dim)
         
     def call(self, inputs, training=None):
-        # 解包输入
         chembert_hidden, smolebert_hidden, molformer_hidden, molebert_hidden, molclr_hidden = inputs
         
-        # 1. 合并序列型嵌入
         seq_embeddings = tf.concat([chembert_hidden, smolebert_hidden, molformer_hidden], axis=1)
         
-        # 2. 合并图型嵌入
         graph_embeddings = tf.concat([molebert_hidden, molclr_hidden], axis=1)
         
-        # 3. 序列型嵌入的自注意力处理
         seq_hidden = seq_embeddings
         for layer in self.seq_layers:
             seq_hidden, _ = layer(seq_hidden, seq_hidden, seq_hidden, training=training)
         
-        # 4. 图型嵌入的自注意力处理
         graph_hidden = graph_embeddings
         for layer in self.graph_layers:
             graph_hidden, _ = layer(graph_hidden, graph_hidden, graph_hidden, training=training)
         
-        # 5. 序列到图的交叉注意力
         seq_to_graph_hidden = seq_hidden
         for layer in self.seq_to_graph_layers:
             seq_to_graph_hidden, seq_to_graph_attn = layer(
                 seq_hidden, graph_hidden, graph_hidden, training=training
             )
         
-        # 6. 图到序列的交叉注意力
         graph_to_seq_hidden = graph_hidden
         for layer in self.graph_to_seq_layers:
             graph_to_seq_hidden, graph_to_seq_attn = layer(
                 graph_hidden, seq_hidden, seq_hidden, training=training
             )
         
-        # 7. 输出投影
         seq_output = self.seq_output(seq_to_graph_hidden)
         graph_output = self.graph_output(graph_to_seq_hidden)
         
@@ -174,26 +160,24 @@ class MolecularCrossAttention(keras.Model):
 
 def create_molecular_model(seq_len=1, graph_len=1, feature_dim=768, hidden_dim=768, num_classes=1):
     """
-    创建完整的分子交叉注意力模型
+    create a cross-attention module for molecules
     
-    参数:
-    - seq_len: 序列型嵌入的序列长度
-    - graph_len: 图型嵌入的序列长度
-    - feature_dim: 输入特征的维度
-    - hidden_dim: 隐藏层维度
-    - num_classes: 输出类别数量（1表示二分类或回归任务）
+    params:
+    - seq_len
+    - graph_len
+    - feature_dim
+    - hidden_dim
+    - num_classes
     
-    返回:
-    - model: Keras模型
+    return:
+    - model: Keras model
     """
-    # 输入层 - 现在指定了特征维度
     chembert_input = keras.Input(shape=(seq_len, feature_dim), name="chembert_input")
     smolebert_input = keras.Input(shape=(seq_len, feature_dim), name="smolebert_input")
     molformer_input = keras.Input(shape=(seq_len, feature_dim), name="molformer_input")
     molebert_input = keras.Input(shape=(graph_len, feature_dim), name="molebert_input")
     molclr_input = keras.Input(shape=(graph_len, feature_dim), name="molclr_input")
     
-    # 交叉注意力模型
     cross_attention = MolecularCrossAttention(
         hidden_dim=hidden_dim,
         num_heads=12,
@@ -202,19 +186,15 @@ def create_molecular_model(seq_len=1, graph_len=1, feature_dim=768, hidden_dim=7
         dropout_rate=0.1
     )
     
-    # 应用交叉注意力
     seq_output, graph_output, _, _ = cross_attention(
         [chembert_input, smolebert_input, molformer_input, molebert_input, molclr_input]
     )
     
-    # 池化层
     seq_pooled = layers.GlobalAveragePooling1D()(seq_output)
     graph_pooled = layers.GlobalAveragePooling1D()(graph_output)
     
-    # 特征融合
     merged = layers.Concatenate()([seq_pooled, graph_pooled])
     
-    # 为了方便获取merged层，创建一个单独的模型
     feature_extractor = keras.Model(
         inputs=[chembert_input, smolebert_input, molformer_input, molebert_input, molclr_input],
         outputs=merged
@@ -222,37 +202,24 @@ def create_molecular_model(seq_len=1, graph_len=1, feature_dim=768, hidden_dim=7
     
     return feature_extractor
 
-# 改进的特征维度调整方法
 def adjust_feature_dim(df, target_dim):
     current_dim = df.shape[1]
-    print(f"当前特征维度: {current_dim}, 目标维度: {target_dim}")
+    # print(f"Current feature dimension: {current_dim}, target feature dimension: {target_dim}")
     
-    # 创建一个简单的线性模型用于维度转换
+    # linear model to transform dimension
     model = keras.Sequential([
         keras.layers.Dense(target_dim, input_shape=(current_dim,))
     ])
     model.compile(optimizer='adam', loss='mse')
     
-    # 转换数据
     data = df.values
-    # 使用模型进行转换
     new_data = model.predict(data, verbose=0)
     
-    print(f"调整后特征维度: {new_data.shape[1]}")
+    print(f"Current feature dimension: {new_data.shape[1]}")
     return new_data
 
 def load_and_preprocess_data():
-    """加载并预处理数据"""
-    # 从CSV文件加载数据并预处理
-    print("从CSV文件加载数据...")
-    
-    # 读取CSV文件
-    # chembert_df = pd.read_csv('./data/bert/d1/chem.csv')
-    # smolebert_df = pd.read_csv('./data/bert/d1/smole.csv')
-    # molformer_df = pd.read_csv('./data/bert/d1/molformer.csv')
-    # molebert_df = pd.read_csv('./data/bert/d1/mole.csv')
-    # molclr_df = pd.read_csv('./data/bert/d1/molclr.csv')
-    # y_df = pd.read_csv('./data/bert/d1/label.csv')
+    print("Load from existing files...")
 
     chembert_df = pd.read_csv('./data/bert/d2/chem2.csv')
     smolebert_df = pd.read_csv('./data/bert/d2/smole2.csv')
@@ -328,7 +295,7 @@ def load_and_preprocess_data():
     return x_data, y_data
 
 def create_prediction_model(input_dim):
-    """创建基于merged特征的预测模型"""
+    """create model based on merged feature"""
     model = keras.Sequential([
         layers.Dense(512, activation='relu', input_shape=(input_dim,)),
         layers.Dropout(0.3),
@@ -338,7 +305,7 @@ def create_prediction_model(input_dim):
         layers.BatchNormalization(),
         layers.Dense(128, activation='relu'),
         layers.Dropout(0.3),
-        layers.Dense(1, activation='sigmoid')  # 二分类
+        layers.Dense(1, activation='sigmoid')  # binary
     ])
     
     model.compile(
@@ -348,23 +315,3 @@ def create_prediction_model(input_dim):
     )
     
     return model
-
-if __name__ == "__main__":
-    # 创建分子交叉注意力模型（特征提取器）
-    print("创建特征提取器模型...")
-    feature_extractor = create_molecular_model()
-    feature_extractor.summary()
-    
-    # 加载数据
-    x_data, y_data = load_and_preprocess_data()
-    
-    # 提取merged特征
-    print("提取merged特征...")
-    merged_features = feature_extractor.predict(x_data)
-    print(f"merged特征形状: {merged_features.shape}")
-    
-    # 保存merged特征为CSV（可选）
-    merged_df = pd.DataFrame(merged_features)
-    # merged_df.to_csv('./data/bert/d1/merged_features.csv', index=False)
-    merged_df.to_csv('./data/bert/d2/merged_features.csv', index=False)
-    print("merged特征已保存为CSV文件")
