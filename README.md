@@ -40,9 +40,10 @@ conda activate TBDMA
 
 **Notice**  
 Make sure you have 3 folder (data, model, output) before running the script.
-- `data/`: raw SMILES files, used to train/test/predict.
-- `model/`: models used in feature extraction step.
-- `output/`: drug antimicrobial activity prediction, including extracted features, trained models, traning and validating CSV results.
+args --model-name and --drug-descriptor are needed
+- data/: Curated raw SMILES corpora employed for model training, hold-out testing, and prospective prediction.
+- model/: Pre-trained feature extractors and associated checkpoints utilized in the molecular representation pipeline.
+- output/: End-to-end antimicrobial-activity predictions, encompassing extracted molecular descriptors, serialized model weights, and comprehensive training/validation metrics exported as CSV artifacts.
   
 **Feature extraction**  
 ```bash
@@ -60,11 +61,15 @@ python drugclassification.py  --input-path data/sample_predict.csv --model-name 
 ---
 
 ## User Interface
-
+CapMolPred offers a user-friendly interface with the following key components:
+1. **Input Section**: Submit sequences in SMILES format (manual entry or file upload).
+3. **Results Visualization**:
+   - **Table View**: Detailed tables of predicted activity and corresponding probabilities.
+   - **Structure Displays**: 2D chemicals structure visualizations.
+3. **Export Options**: Download results in tab-delimited or XML formats.
 ---
 
 ## Citation
-If you use RegRNA 3.0 in your research, please cite:  
 DOI: [to be published].
 
 ---
