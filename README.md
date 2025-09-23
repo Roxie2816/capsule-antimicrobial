@@ -33,6 +33,9 @@ You can set up the environment using conda:
 conda env create -f environment.yml
 conda activate TBDMA
 ```
+
+---
+
 ## Quick Start
 
 **Notice**  
@@ -53,6 +56,9 @@ python drugclassification.py  --input-path data/ecoli_predict.csv --model-name b
 ```bash
 python drugclassification.py  --input-path data/sample_predict.csv --model-name bert_chemmolefusion_capsule --drug-descripter fusion --predict
 ```
+
+---
+
 ## User Interface
 
 ---
