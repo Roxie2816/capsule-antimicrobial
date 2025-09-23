@@ -12,3 +12,17 @@ python drugclassification.py  --input-path data/sample_predict.csv --model-name 
 
 **Notice**  
 Make sure you have 3 folder (data, model, output) before running the script.
+
+<!-- 目录 -->
+- [安装](#install)
+- [快速开始](#quick-start)
+
+<!-- 任意位置手动放锚点 -->
+<a name="install"></a>
+## 安装
+
+这里写安装步骤...
+
+## 快速开始
+
+写你的教程...
