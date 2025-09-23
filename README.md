@@ -1,16 +1,11 @@
 # CapMolPred: Enhancing Antimicrobial Molecule Prediction via Dynamic Routing Capsule Networks and Multi-Source Molecular Embeddings
 Our model incorporates a unique capsule network architecture and introduces innovations in loss function selection and feature processing modules, demonstrating superior performance in predicting inhibitory activities against Escherichia coli and Acinetobacter baumannii. 
-**Access CapMolPred at**: [https://awi.cuhk.edu.cn/~CapMolPred](https://awi.cuhk.edu.cn/~CapMolPred)
+- **Access CapMolPred at**: [https://awi.cuhk.edu.cn/~CapMolPred](https://awi.cuhk.edu.cn/~CapMolPred)
 
-
-**Notice**  
-Make sure you have 3 folder (data, model, output) before running the script.
-
-<!-- 目录 -->
 - [Environment Setup](#install)
 - [Quick Start](#quick-start)
+- [User Interface](#user-interface)
 
-<!-- 任意位置手动放锚点 -->
 <a name="install"></a>
 ## Environment Setup
 CapMolPred requires several dependencies. Here are the main requirements:
@@ -39,6 +34,13 @@ conda env create -f environment.yml
 conda activate TBDMA
 ```
 ## Quick Start
+
+**Notice**  
+Make sure you have 3 folder (data, model, output) before running the script.
+- `data/`: raw SMILES files, used to train/test/predict.
+- `model/`: models used in feature extraction step.
+- `output/`: drug antimicrobial activity prediction, including extracted features, trained models, traning and validating CSV results.
+  
 **Feature extraction**  
 ```bash
 python drugclassification.py --input-path data/sample.csv --model-name bert_chemmolefusion_capsule --drug-descriptor fusion
@@ -51,3 +53,4 @@ python drugclassification.py  --input-path data/ecoli_predict.csv --model-name b
 ```bash
 python drugclassification.py  --input-path data/sample_predict.csv --model-name bert_chemmolefusion_capsule --drug-descripter fusion --predict
 ```
+## User Interface
