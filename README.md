@@ -77,5 +77,5 @@ DOI: [to be published].
 ## Contact
 For technical support or inquiries, please contact:  
 Dr. Hsi-Yuan Huang  
-Address: Faculty of Computer Science and Control Engineering, Shenzhen University of Advanced Technology, Shenzhen 518107, China 
+Address: Faculty of Computer Science and Control Engineering, Shenzhen University of Advanced Technology, Shenzhen 518107, China  
 Email: huanghsiyuan#suat-sz.edu.cn
