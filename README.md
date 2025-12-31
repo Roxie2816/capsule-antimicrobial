@@ -1,6 +1,6 @@
-# CapMolPred: Enhancing Antimicrobial Molecule Prediction via Dynamic Routing Capsule Networks and Multi-Source Molecular Embeddings
-Our model incorporates a unique capsule network architecture and introduces innovations in loss function selection and feature processing modules, demonstrating superior performance in predicting inhibitory activities against Escherichia coli and Acinetobacter baumannii. 
-- **Access CapMolPred at**: [https://awi.cuhk.edu.cn/~CapMolPred](https://awi.cuhk.edu.cn/~CapMolPred)
+# CapMolPred: Multi-Source Language Models Fusion with Dynamic Routing Capsule Network for Antimicrobial Compound Identification
+We propose CapMolPred, which integrates five domain-adapted chemistry language models for high-dimensional small-molecule encoding and adopts cross-attention for heterogeneous embedding alignment. It also combines a capsule network with dynamic routing and a novel asymmetric loss function to achieve superior inhibitory potency prediction against Escherichia coli and Acinetobacter baumannii compared to conventional methods.
+- **Access CapMolPred at**: [https://dmci.xmu.edu.cn/CapMolPred/indexpage.php](https://dmci.xmu.edu.cn/CapMolPred/indexpage.php)
 
 - [Environment Setup](#install)
 - [Quick Start](#quick-start)
@@ -69,13 +69,9 @@ CapMolPred offers a user-friendly interface with the following key components:
 3. **Export Options**: Download results in tab-delimited or XML formats.
 ---
 
-## Citation
-DOI: [to be published].
-
----
 
 ## Contact
 For technical support or inquiries, please contact:  
-Dr. Hsi-Yuan Huang  
+Dr. Yixian Huang  
 Address: Faculty of Computer Science and Control Engineering, Shenzhen University of Advanced Technology, Shenzhen 518107, China  
-Email: huanghsiyuan#suat-sz.edu.cn
+Email: huangyixian@suat-sz.edu.cn
