@@ -34,6 +34,19 @@ conda env create -f environment.yml
 conda activate TBDMA
 ```
 
+### Data Partitioning & Training
+
+To rigorously evaluate the model's performance and its generalization capability across unseen chemical spaces, we implemented a 5-fold scaffold split strategy:
+
+- **Scaffold Split Logic:** Unlike traditional random splitting, scaffold splitting ensures that all molecules sharing the same core scaffold reside within the same set (either training or test).
+- **Preventing Data Leakage:** This approach prevents the model from achieving artificially high performance by "memorizing" similar structural analogs, thereby ensuring a more robust evaluation of its ability to generalize to novel structures.
+
+**Training Protocol:**
+- **Ratio:** An approximate 8:2 training-to-test ratio was maintained.
+- **Framework:** Developed using TensorFlow and Keras.
+- **Hyperparameters:** Optimized using the Adam optimizer (initial LR=0.0001) with a batch size of 64.
+- **Early Stopping:** Training halts if no improvement in validation accuracy is observed for 50 consecutive epochs to prevent overfitting.
+
 ---
 
 ## Quick Start
